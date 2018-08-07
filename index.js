@@ -28,6 +28,18 @@ const DIRECTION = {
 
 
 
+function createBaseState() {
+	return  {
+		players: [
+			{position: [0, Math.floor(SETTINGS.COLUMNS/2)], wallsRemaining: SETTINGS.WALLS_PER_PLAYER},
+			{position: [SETTINGS.ROWS - 1, Math.floor(SETTINGS.COLUMNS/2)], wallsRemaining: SETTINGS.WALLS_PER_PLAYER}
+		],
+		currPlayer: 0,
+		winner: null,
+		walls: []
+	}
+}
+
 function setWallSegment(state, wall) {
 
 	const [p1, p2] = wall;
@@ -36,9 +48,25 @@ function setWallSegment(state, wall) {
 		throw new NotAdjacentException();
 	}
 
-	// const W
+	const wallKeys = state.walls.map(createWallKey);
+	if (wallKeys.contains(createWallKey(wall))) {
+		throw new NotAllowedWallException();
+	}
 
+	return Object.assign({}, state, {
+		walls: state.walls.concat([wall])
+	});
 }
+
+function isWinnable(state) {
+	state.players.forEach(player => {
+
+	});
+}
+
+// TODO: 
+// function isReachable(position, )
+
 
 function moveCurrentPlayer(state, direction) {
 
@@ -50,8 +78,7 @@ function moveCurrentPlayer(state, direction) {
 				[state.currPlayer]: Object.assign({}, state.players[state.currPlayer], { 
 					position: path[path.length - 1]
 				})
-			}),
-			currPlayer: getNextPlayer(state)
+			})
 		});
 	} else {
 		throw new NotAllowedMovementException();
@@ -209,6 +236,10 @@ class NotAdjacentException extends Error {
 }
 
 class NotAllowedMovementException extends Error {
+
+}
+
+class NotAllowedWallException extends Error {
 
 }
 
