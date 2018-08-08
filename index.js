@@ -18,14 +18,20 @@
 const SETTINGS = {
 	ROWS: 9,
 	COLUMNS: 9,
-	WALLS_PER_PLAYER: 10
-	//...
+	WALLS_PER_PLAYER: 10,
+	ALLOW_DIAGONAL_MOVEMENT: false
 };
 
 const DIRECTION = {
 	UP: 1, DOWN: 2, LEFT: 4, RIGHT: 8
 };
 
+const DIAGONAL_DIRECTION = {
+	UP_RIGHT: DIRECTION.UP | DIRECTION.RIGHT,
+	UP_LEFT:  DIRECTION.UP | DIRECTION.LEFT,
+	DOWN_RIGHT: DIRECTION.DOWN | DIRECTION.RIGHT,
+	DOWN_LEFT: DIRECTION.DOWN | DIRECTION.LEFT
+};
 
 
 function createBaseState() {
@@ -68,15 +74,14 @@ function isWinnable(state) {
 // function isReachable(position, )
 
 
-function moveCurrentPlayer(state, direction) {
+function moveCurrentPlayer(state, position) {
+	const possiblePositionKeys = getPossiblePositions(state).map(createPositionKey);
 
-	let hops = resolveMovement(state, direction);
-
-	if (isMovementValid(state, hops)) {
+	if (possiblePositionKeys.indexOf(createPositionKey(position)) !== -1) {
 		return Object.assign({}, state, {
 			players: Object.assign({}, state.players, {
 				[state.currPlayer]: Object.assign({}, state.players[state.currPlayer], { 
-					position: path[path.length - 1]
+					position: position
 				})
 			})
 		});
@@ -87,11 +92,12 @@ function moveCurrentPlayer(state, direction) {
 }
 
 
-function getPossiblePositions(state, position) {
-
-	// TODO: allow diagonal movement
-	let previousPosition = position;
-	return Object.values(DIRECTION)
+function getPossiblePositions(state) {
+	let directions = Object.values(DIRECTION);
+	if (SETTINGS.ALLOW_DIAGONAL_MOVEMENT) {
+		directions = directions.concat(Object.values(DIAGONAL_DIRECTION));
+	}
+	return directions
 		.map(direction => resolveMovement(state, direction))
 		.filter(hops => isMovementValid(state, hops))
 		.map(hops => hops[hops.length - 1]);
@@ -114,7 +120,7 @@ function isWallBetween(state, position1, position2) {
 	}
 
 	const direction = getDirection(position1, position2);
-	const isNotDiagonal = Object.values(DIRECTION).reduce((isPrimitive, primitive) => isPrimitive && primitive === direction, true);
+	const isNotDiagonal = Object.values(DIRECTION).indexOf(direction) !== -1;
 	const wallKey = createWallKey([position1, position2]);
 
 	if (isNotDiagonal) {
@@ -123,9 +129,29 @@ function isWallBetween(state, position1, position2) {
 		});
 		return false;
 	} else {
-		// TODO: improvement...
-		throw new WereLazyException();
+	    const [baseDirection1, baseDirection2] = getBaseDirections(direction);  // should always be 2 directions
+
+        // walls for base directions up and right:
+        //      |
+        //      0 pos2
+        //      |
+        // --3--+--1--
+        //      |
+        // pos1 2
+        //      |
+        const walls = [
+            isWallBetween(state, resolveDirection(position1, baseDirection1), position2),
+            isWallBetween(state, resolveDirection(position1, baseDirection2), position2),
+            isWallBetween(state, position1, resolveDirection(position1, baseDirection2)),
+            isWallBetween(state, position1, resolveDirection(position1, baseDirection1))
+        ];
+        return (walls[0] && walls[1]) || (walls[2] && walls[3]) || (walls[0] && walls[2]) || (walls[1] && walls[3]);
 	}
+}
+
+
+function getBaseDirections(direction) {
+    return Object.values(DIRECTION).filter(baseDirection => direction & baseDirection);
 }
 
 
@@ -142,7 +168,7 @@ function getDirection(position1, position2) {
 		throw new NotAdjacentException();
 	}
 
-	let direction = 0
+	let direction = 0;
 
 	if (x2 > x1) {
 		direction |= DIRECTION.RIGHT;
@@ -202,7 +228,7 @@ function resolveMovement(state, direction) {
 
 
 function resolveDirection(pos, direction) {
-	const [x, y] = pos;
+	let [x, y] = pos;
 
 	if (direction & DIRECTION.UP) {
 		y--;
@@ -228,7 +254,11 @@ function getNextPlayer(state) {
 }
 
 function createWallKey(wall) {
-	return wall.map(position => position.join('-')).sort().join('-');
+	return wall.map(createPositionKey).sort().join('-');
+}
+
+function createPositionKey(position) {
+	return position.join('-');
 }
 
 class NotAdjacentException extends Error {
